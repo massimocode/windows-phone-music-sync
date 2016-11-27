@@ -8,16 +8,17 @@ Music folder on the Windows Phone.
 but `Music Library/My Album/Some Other Folder` would not.
 
 ## How do I use it?
-Before you run the program, it might be a good idea to make a backup of your phone, just in case this does something crazy.
-It works for me though :)
-1) Plug your phone into your computer
-2) Make sure you've unlocked your phone
-3) Open the Phone's Music folder in Windows Explorer - this is to ensure the computer can read/write to the phone
-4) If this is the first time you're running the program, you will need to create a folder called "From PC"
-(it is case-sensitive). The reason you need to create this folder is that the normal "Music" folder is "read-only"
-and I haven't found a way to allow C# to create subfolders within it, even though we can create files in it!
-So the initial subfolder needs to be created manually and then we will be able to sync whatever we like to that folder.
-5) Run the program
+1. Plug your phone into your computer
+2. Make sure you've unlocked your phone
+3. Open the Phone's Music folder in Windows Explorer - this is to ensure the computer can read/write to the phone
+4. If this is the first time you're running the program, you will need to create a folder called "From PC"
+(it is case-sensitive). This is where all your music will be synced to.
+5. Run the program
+
+## Why do I need to create a folder called "From PC". Why can't my music be synced directly to the Music folder?
+We can create sub-folders inside the phone's Music folder using Windows Explorer but we get an error when trying to
+do it via the WinRT API. Strangely enough, we only get an error when trying to create folders, not when trying to create files!
+So the initial "From PC" subfolder needs to be created manually and then we will be able to sync whatever we like to that folder.
 
 ## The program doesn't work
 Try sending me a screenshot of the issue you're having and I'll try to fix it when I get some time.
