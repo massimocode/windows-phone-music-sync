@@ -1,96 +1,94 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using Windows.Foundation;
 using Windows.Storage;
 
-namespace ConsoleApplication2
+namespace WindowsPhoneMusicSync
 {
-    class Program
+    public class Program
     {
-        static void Main()
+        public static void Main()
         {
             Console.Write("Enter the name of your phone as it appears (case-sensitive) in My Computer (i.e. Windows phone): ");
             var phoneName = Console.ReadLine();
-            MainAsync(phoneName).Wait();
+
+            var cancellationTokenSource = new CancellationTokenSource();
+
+            Console.CancelKeyPress += (sender, args) =>
+            {
+                cancellationTokenSource.Cancel();
+                args.Cancel = true;
+            };
+
+            MainAsync(phoneName, cancellationTokenSource.Token).Wait();
         }
 
-        static async Task MainAsync(string phoneName)
+        public static async Task MainAsync(string phoneName, CancellationToken cancellationToken)
         {
             if (phoneName == "")
             {
                 phoneName = "Windows phone";
             }
 
-            var localMusicLibrary = KnownFolders.MusicLibrary;
-            var phoneMusicLibrary = await GetPhoneMusicLibrary(phoneName);
+            var localMusicFolder = KnownFolders.MusicLibrary;
 
-            var folders = await localMusicLibrary.GetFoldersAsync().AsTask();
+            var phoneMusicFolder = await PhoneRepository.GetPhoneMusicFolder(phoneName);
+            var phoneLibraryIndex = await PhoneRepository.GetPhoneLibraryIndex(phoneName);
 
-            foreach (var sourceFolder in folders)
+            var sourceFolders = await localMusicFolder.GetFoldersAsync().AsTask();
+            foreach (var sourceFolder in sourceFolders)
             {
-                var destinationFolder = await GetOrCreateSubFolder(phoneMusicLibrary, sourceFolder.Name);
+                var destinationFolder = await phoneMusicFolder.CreateFolderAsync(sourceFolder.Name, CreationCollisionOption.OpenIfExists).AsTask();
+                var filesInDestinationFolder = await destinationFolder.GetFilesAsync().AsTask();
 
                 var sourceFiles = await sourceFolder.GetFilesAsync().AsTask();
                 foreach (var sourceFile in sourceFiles)
                 {
-                    var needsSyncing = true;
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
+                    var sourceVersion = GetVersion(sourceFile.Path);
+                    var path = Path.Combine(sourceFolder.Path, sourceFile.Path);
+                    
+                    // If the file does not exist or the version is not the same then the file needs syncing
+                    var needsSyncing = filesInDestinationFolder.All(x => x.Name != sourceFile.Name) || phoneLibraryIndex.GetFile(path)?.Version != sourceVersion;
+
+                    if (!needsSyncing)
+                    {
+                        Console.WriteLine("Skipped " + sourceFile.Path);
+                        continue;
+                    }
+
+                    // Temporary Code: Delete the file so that we can write a new one. Might help with the refreshing of the album art issue.
                     try
                     {
-                        var destinationFile = await destinationFolder.GetFileAsync(sourceFile.Name).AsTask();
-                        var destinationFileProperties = await destinationFile.GetBasicPropertiesAsync().AsTask();
-                        if (destinationFileProperties.Size == (await sourceFile.GetBasicPropertiesAsync().AsTask()).Size)
+                        var destinationFile = await destinationFolder.TryGetItemAsync(sourceFile.Name).AsTask();
+                        if (destinationFile != null)
                         {
-                            needsSyncing = false;
-                            Console.WriteLine("Skipping " + sourceFile.Path);
+                            await destinationFile.DeleteAsync().AsTask();
                         }
                     }
                     catch
                     {
                     }
-                    if (needsSyncing)
-                    {
-                        Console.WriteLine("Copying " + sourceFile.Path);
-                        await sourceFile.CopyAsync(destinationFolder, sourceFile.Name, NameCollisionOption.ReplaceExisting).AsTask();
-                        Console.WriteLine("Copied " + sourceFile.Path);
-                    }
+
+                    Console.WriteLine("Copying " + sourceFile.Path);
+                    await sourceFile.CopyAsync(destinationFolder, sourceFile.Name, NameCollisionOption.ReplaceExisting).AsTask();
+                    Console.WriteLine("Copied " + sourceFile.Path);
+
+                    phoneLibraryIndex.AddOrUpdateFile(new PhoneMusicFile { Path = path, Version = sourceVersion });
+                    await PhoneRepository.SavePhoneLibraryIndex(phoneMusicFolder, phoneLibraryIndex);
                 }
             }
         }
 
-        private static async Task<IStorageFolder> GetOrCreateSubFolder(IStorageFolder parentFolder, string subFolderName)
+        private static string GetVersion(string sourceFilePath)
         {
-            return await parentFolder.CreateFolderAsync(subFolderName, CreationCollisionOption.OpenIfExists).AsTask();
-        }
-
-        private static async Task<StorageFolder> GetPhoneMusicLibrary(string phoneName)
-        {
-            var storage = (await KnownFolders.RemovableDevices.GetFoldersAsync().AsTask()).First(a => a.Name == phoneName);
-            return await storage.GetFolderAsync(@"Phone\Music\From PC").AsTask();
-        }
-    }
-
-    public static class Extensions
-    {
-        public static Task<T> AsTask<T>(this IAsyncOperation<T> op)
-        {
-            var ret = new TaskCompletionSource<T>();
-            op.Completed = (info, status) =>
-            {
-                if (status == AsyncStatus.Completed)
-                {
-                    ret.SetResult(info.GetResults());
-                }
-                if (status == AsyncStatus.Canceled)
-                {
-                    ret.SetCanceled();
-                }
-                if (status == AsyncStatus.Error)
-                {
-                    ret.SetException(info.ErrorCode);
-                }
-            };
-            return ret.Task;
+            return new FileInfo(sourceFilePath).LastWriteTimeUtc.Ticks.ToString();
         }
     }
 }
