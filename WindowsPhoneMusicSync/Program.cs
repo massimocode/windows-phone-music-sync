@@ -63,19 +63,6 @@ namespace WindowsPhoneMusicSync
                         continue;
                     }
 
-                    // Temporary Code: Delete the file so that we can write a new one. Might help with the refreshing of the album art issue.
-                    try
-                    {
-                        var destinationFile = await destinationFolder.TryGetItemAsync(sourceFile.Name).AsTask();
-                        if (destinationFile != null)
-                        {
-                            await destinationFile.DeleteAsync().AsTask();
-                        }
-                    }
-                    catch
-                    {
-                    }
-
                     Console.WriteLine("Copying " + sourceFile.Path);
                     await sourceFile.CopyAsync(destinationFolder, sourceFile.Name, NameCollisionOption.ReplaceExisting).AsTask();
                     Console.WriteLine("Copied " + sourceFile.Path);
