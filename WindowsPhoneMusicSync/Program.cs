@@ -38,9 +38,18 @@ namespace WindowsPhoneMusicSync
             var phoneLibraryIndex = await PhoneRepository.GetPhoneLibraryIndex(phoneName);
 
             var sourceFolders = await localMusicFolder.GetFoldersAsync().AsTask();
+            var destinationFolders = await phoneMusicFolder.GetFoldersAsync().AsTask();
+
             foreach (var sourceFolder in sourceFolders)
             {
-                var destinationFolder = await phoneMusicFolder.CreateFolderAsync(sourceFolder.Name, CreationCollisionOption.OpenIfExists).AsTask();
+                var destinationFolder = destinationFolders.FirstOrDefault(x => x.Name == sourceFolder.Name);
+
+                if (destinationFolder == null) {
+                    Console.WriteLine("Creating folder " + sourceFolder.Name);
+                    destinationFolder = await phoneMusicFolder.CreateFolderAsync(sourceFolder.Name, CreationCollisionOption.OpenIfExists).AsTask();
+                    Console.WriteLine("Created folder " + sourceFolder.Name);
+                }
+
                 var filesInDestinationFolder = await destinationFolder.GetFilesAsync().AsTask();
 
                 var sourceFiles = await sourceFolder.GetFilesAsync().AsTask();
@@ -70,6 +79,20 @@ namespace WindowsPhoneMusicSync
                     phoneLibraryIndex.AddOrUpdateFile(new PhoneMusicFile { Path = path, Version = sourceVersion });
                     await PhoneRepository.SavePhoneLibraryIndex(phoneMusicFolder, phoneLibraryIndex);
                 }
+
+                foreach (var fileToDelete in filesInDestinationFolder.Where(x => sourceFiles.All(sourceFile => sourceFile.Name != x.Name)))
+                {
+                    Console.WriteLine("Deleting file " + fileToDelete.Path);
+                    await fileToDelete.DeleteAsync().AsTask();
+                    Console.WriteLine("Deleted file " + fileToDelete.Path);
+                }
+            }
+
+            foreach (var folderToDelete in destinationFolders.Where(x => sourceFolders.All(sourceFolder => sourceFolder.Name != x.Name)))
+            {
+                Console.WriteLine("Deleting folder " + folderToDelete.Path);
+                await folderToDelete.DeleteAsync().AsTask();
+                Console.WriteLine("Deleted folder " + folderToDelete.Path);
             }
         }
 

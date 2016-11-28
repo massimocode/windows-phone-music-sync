@@ -6,6 +6,7 @@ Music folder on the Windows Phone.
 - It does not copy files that already exist on the phone and have not changed.
 - It only copies 1 level of folders, so for example `Music Library/My Album` would be copied,
 but `Music Library/My Album/Some Other Folder` would not.
+- It deletes files and/or folders on the phone that no longer exist on the computer.
 
 ## How do I use it?
 1. Plug your phone into your computer
