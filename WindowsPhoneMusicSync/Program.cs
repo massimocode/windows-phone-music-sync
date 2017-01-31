@@ -31,12 +31,12 @@ namespace WindowsPhoneMusicSync
             {
                 phoneName = "Windows phone";
             }
+            var phoneRepository = new PhoneRepository(phoneName);
+
+            var phoneMusicFolder = await phoneRepository.GetPhoneMusicFolder();
+            var phoneLibraryIndex = await phoneRepository.GetPhoneLibraryIndex();
 
             var localMusicFolder = KnownFolders.MusicLibrary;
-
-            var phoneMusicFolder = await PhoneRepository.GetPhoneMusicFolder(phoneName);
-            var phoneLibraryIndex = await PhoneRepository.GetPhoneLibraryIndex(phoneName);
-
             var sourceFolders = await localMusicFolder.GetFoldersAsync().AsTask();
             var destinationFolders = await phoneMusicFolder.GetFoldersAsync().AsTask();
 
@@ -77,7 +77,7 @@ namespace WindowsPhoneMusicSync
                     Console.WriteLine("Copied " + sourceFile.Path);
 
                     phoneLibraryIndex.AddOrUpdateFile(new PhoneMusicFile { Path = path, Version = sourceVersion });
-                    await PhoneRepository.SavePhoneLibraryIndex(phoneMusicFolder, phoneLibraryIndex);
+                    await phoneRepository.SavePhoneLibraryIndex(phoneLibraryIndex);
                 }
 
                 foreach (var fileToDelete in filesInDestinationFolder.Where(x => sourceFiles.All(sourceFile => sourceFile.Name != x.Name)))
